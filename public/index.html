@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PicFlow · 旅行图像生成</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+:root {
+  --bg:#09090b; --s1:#111115; --s2:#18181e; --s3:#222228;
+  --lime:#c8ff57; --lime-dim:rgba(200,255,87,.10); --lime-b:rgba(200,255,87,.2);
+  --indigo:#7c6fff; --coral:#ff6b6b;
+  --text:#efefef; --muted:#7878a0; --faint:#38384a; --border:#232330;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','PingFang SC',sans-serif;-webkit-font-smoothing:antialiased}
+.app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:80px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;position:sticky;top:0;z-index:50;background:rgba(9,9,11,.93);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.logo{font-size:22px;font-weight:900;letter-spacing:-.5px}
+.logo span{color:var(--lime)}
+.badge{font-size:11px;color:var(--muted);background:var(--s2);padding:4px 10px;border-radius:99px;border:1px solid var(--border)}
+
+/* PAGES */
+.page{display:none;padding:0 20px 20px;animation:fadeUp .3s ease both}
+.page.active{display:block}
+
+/* HERO */
+.hero{padding:24px 0 20px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--lime-dim);border:1px solid var(--lime-b);color:var(--lime);font-size:11px;font-weight:500;padding:5px 12px;border-radius:99px;margin-bottom:14px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 1.8s ease infinite}
+.hero h1{font-size:26px;font-weight:900;line-height:1.25;letter-spacing:-.5px}
+.hero h1 em{color:var(--lime);font-style:normal}
+.hero p{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.7}
+
+/* DROP ZONE */
+.drop{margin:4px 0 16px;border:1.5px dashed var(--faint);border-radius:16px;padding:28px 20px;text-align:center;background:var(--s1);cursor:pointer;transition:all .25s}
+.drop:hover,.drop.over{border-color:var(--lime);background:rgba(200,255,87,.04)}
+.drop-ico{width:52px;height:52px;border-radius:14px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px}
+.drop h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.drop p{font-size:12px;color:var(--muted)}
+
+/* THUMBS */
+.thumbs-wrap{display:none;flex-direction:column;gap:10px;margin-bottom:16px}
+.thumbs-head{display:flex;justify-content:space-between;align-items:center}
+.thumbs-label{font-size:12px;color:var(--muted)}
+.clear-btn{font-size:11px;color:var(--coral);background:none;border:none;cursor:pointer;font-family:inherit}
+.thumb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.thumb{aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;background:var(--s2)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb-del{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.75);color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.thumb-add{aspect-ratio:1;border-radius:10px;border:1.5px dashed var(--faint);background:none;color:var(--faint);font-size:22px;cursor:pointer;transition:all .2s}
+.thumb-add:hover{border-color:var(--lime);color:var(--lime)}
+
+/* SECTION LABEL */
+.slabel{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+
+/* GOALS */
+.goals{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.goal{display:flex;align-items:center;gap:14px;background:var(--s1);border:1.5px solid var(--border);border-radius:16px;padding:14px 16px;cursor:pointer;transition:all .2s}
+.goal.active{border-color:var(--lime);background:rgba(200,255,87,.04)}
+.goal-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.goal-info{flex:1}
+.goal-name{font-size:13px;font-weight:600}
+.goal-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.goal-tag{font-size:10px;padding:3px 9px;border-radius:99px;background:var(--s3);color:var(--muted);white-space:nowrap;transition:all .2s}
+.goal.active .goal-tag{background:var(--lime);color:#09090b;font-weight:700}
+
+/* STYLE ROW */
+.style-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:20px;scrollbar-width:none}
+.style-row::-webkit-scrollbar{display:none}
+.style-chip{padding:6px 14px;border-radius:99px;white-space:nowrap;border:1.5px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-family:inherit;cursor:pointer;transition:all .2s;flex-shrink:0}
+.style-chip.on{border-color:var(--lime);color:var(--lime);background:var(--lime-dim)}
+
+/* CTA */
+.cta{width:100%;padding:16px;background:var(--lime);color:#09090b;border:none;border-radius:16px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s}
+.cta:disabled{opacity:.35;cursor:not-allowed}
+
+/* PAGE HEADER */
+.page-head{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.back{width:34px;height:34px;border-radius:50%;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0}
+.page-title{font-size:17px;font-weight:700}
+
+/* PROGRESS */
+.prog-wrap{margin-bottom:20px}
+.prog-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.prog-labels strong{color:var(--lime)}
+.prog-bar{height:3px;background:var(--s3);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--indigo),var(--lime));transition:width .6s ease}
+
+/* STEPS */
+.step-track{display:flex;flex-direction:column;gap:4px;margin-bottom:20px}
+.step-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;background:var(--s1);border:1px solid var(--border);transition:all .3s}
+.step-row.running{border-color:var(--lime);background:rgba(200,255,87,.04)}
+.step-row.done{opacity:.5}
+.step-icon{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--s3)}
+.step-row.running .step-icon{background:var(--lime);color:#09090b}
+.step-text{font-size:12px}
+.step-row.pending .step-text{color:var(--muted)}
+.spin{animation:spin .8s linear infinite;display:inline-block}
+
+/* RESULT GRID */
+.gen-prompt{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:16px;text-align:center}
+.gen-prompt h3{font-size:14px;font-weight:700;margin-bottom:6px}
+.gen-prompt p{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+.gen-btn{padding:13px 28px;background:var(--lime);color:#09090b;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer}
+.gen-status{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted)}
+.result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px}
+.r-card{aspect-ratio:1;border-radius:10px;overflow:hidden;position:relative;border:1.5px solid var(--border);cursor:pointer;transition:border-color .2s}
+.r-card.sel{border-color:var(--lime)}
+.r-card img{width:100%;height:100%;object-fit:cover;display:block}
+.r-card-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.r-card-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0%,transparent 50%);pointer-events:none}
+.r-card-meta{position:absolute;bottom:0;left:0;right:0;padding:8px}
+.r-card-label{font-size:9px;color:rgba(255,255,255,.85);line-height:1.4}
+.r-type{font-size:8px;padding:2px 5px;border-radius:4px;display:inline-block;margin-top:2px}
+.rt-scene{background:rgba(124,111,255,.25);color:#c0b8ff}
+.rt-person{background:rgba(200,255,87,.2);color:var(--lime)}
+.rt-food{background:rgba(255,180,50,.2);color:#ffc878}
+.rt-detail{background:rgba(255,107,107,.2);color:#ffaaaa}
+.rt-vibe{background:rgba(91,200,255,.2);color:#a0ddff}
+.sel-check{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--lime);color:#09090b;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center}
+.r-card.sel .sel-check{display:flex}
+.gen-prog{width:60%;height:2px;background:var(--s3);border-radius:99px;overflow:hidden;margin:0 auto}
+.gen-prog-fill{height:100%;background:var(--lime);transition:width .5s}
+
+/* DETAIL BOX */
+.detail-box{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:14px}
+.detail-title{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:10px}
+.meta-row{display:flex;gap:10px;margin-bottom:8px;font-size:12px;line-height:1.6}
+.mk{color:var(--muted);width:56px;flex-shrink:0}
+.dl-link{display:block;margin-top:8px;padding:8px 14px;background:var(--lime-dim);border:1px solid var(--lime-b);border-radius:8px;color:var(--lime);font-size:12px;text-align:center;text-decoration:none}
+
+/* ACTIONS */
+.actions{display:flex;gap:8px}
+.act-btn{flex:1;padding:14px;border-radius:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.act-pri{background:var(--lime);color:#09090b;border:none}
+.act-sec{background:var(--s2);color:var(--text);border:1.5px solid var(--border)}
+
+/* INSPIRE */
+.loc-bar{display:flex;align-items:center;gap:8px;background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px}
+.inspire-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px}
+.icard-img{height:90px;position:relative;display:flex;align-items:flex-end;padding:12px;overflow:hidden}
+.icard-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;opacity:.18}
+.icard-body{padding:14px}
+.icard-type{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.icard-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.icard-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px}
+.tip{display:flex;gap:8px;font-size:12px;margin-bottom:7px}
+.tip-t{color:var(--muted);line-height:1.5}
+.tip-t strong{color:var(--text)}
+.lime-tag{font-size:10px;padding:4px 10px;border-radius:99px;background:var(--lime-dim);color:var(--lime);border:1px solid var(--lime-b);position:relative}
+
+/* ERROR */
+.err-box{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--coral);line-height:1.7}
+.err-box strong{display:block;margin-bottom:4px;font-size:13px}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(14,14,18,.96);backdrop-filter:blur(16px);border-top:1px solid var(--border);display:flex;padding:10px 0 16px;z-index:100}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;background:none;border:none;color:inherit;font-family:inherit;padding:4px 0}
+.nav-ic{font-size:20px;line-height:1}
+.nav-lbl{font-size:9px;color:var(--muted)}
+.nav-btn.active .nav-lbl{color:var(--lime)}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--s3);color:var(--text);border:1px solid var(--border);padding:10px 18px;border-radius:99px;font-size:12px;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:200}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="logo">Pic<span>Flow</span></div>
+    <div class="badge">✦ Replicate 驱动</div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="page active" id="p-upload">
+    <div class="hero">
+      <div class="pill"><div class="dot"></div>场景理解 + 真实图像生成</div>
+      <h1>一次旅行<br><em>真实生成</em>发圈图</h1>
+      <p>上传照片 → AI 理解场景 → 生成真实图片</p>
+    </div>
+
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
+      <div class="drop-ico">📷</div>
+      <h3>点击或拖放照片</h3>
+      <p>支持 JPG / PNG，最多 8 张</p>
+    </div>
+
+    <div class="thumbs-wrap" id="thumbsWrap">
+      <div class="thumbs-head">
+        <span class="thumbs-label" id="thumbsLabel">已上传 0 张</span>
+        <button class="clear-btn" onclick="clearAll()">清空</button>
+      </div>
+      <div class="thumb-grid" id="thumbGrid"></div>
+    </div>
+
+    <div class="slabel">选择目标</div>
+    <div class="goals">
+      <div class="goal active" data-goal="4" onclick="pickGoal(this)">
+        <div class="goal-ico" style="background:rgba(200,255,87,.15)">⬛</div>
+        <div class="goal-info"><div class="goal-name">补齐四宫格</div><div class="goal-desc">生成 3 张真实图片</div></div>
+        <div class="goal-tag">3张</div>
+      </div>
+      <div class="goal" data-goal="9" onclick="pickGoal(this)">
+        <div class="goal-ico" style="background:rgba(124,111,255,.15)">⬜</div>
+        <div class="goal-info"><div class="goal-name">补齐九宫格</div><div class="goal-desc">生成 6 张真实图片</div></div>
+        <div class="goal-tag">6张</div>
+      </div>
+      <div class="goal" data-goal="inspire" onclick="pickGoal(this)">
+        <div class="goal-ico" style="background:rgba(255,107,107,.15)">💡</div>
+        <div class="goal-info"><div class="goal-name">拍照灵感模式</div><div class="goal-desc">获取构图建议，不生成图片</div></div>
+        <div class="goal-tag">灵感</div>
+      </div>
+    </div>
+
+    <div class="slabel">风格偏好</div>
+    <div class="style-row" id="styleRow">
+      <button class="style-chip on" onclick="pickStyle(this)">不限</button>
+      <button class="style-chip" onclick="pickStyle(this)">日系清新</button>
+      <button class="style-chip" onclick="pickStyle(this)">胶片感</button>
+      <button class="style-chip" onclick="pickStyle(this)">城市夜景</button>
+      <button class="style-chip" onclick="pickStyle(this)">自然风光</button>
+      <button class="style-chip" onclick="pickStyle(this)">复古色调</button>
+    </div>
+
+    <button class="cta" id="analyzeBtn" onclick="startAnalysis()" disabled>🚀 开始 AI 分析</button>
+  </div>
+
+  <!-- ANALYZING -->
+  <div class="page" id="p-analyze">
+    <div class="page-head">
+      <div class="back" onclick="goPage('p-upload')">←</div>
+      <div class="page-title" id="analyzeTitle">AI 正在理解场景…</div>
+    </div>
+    <div class="prog-wrap">
+      <div class="prog-labels"><span>分析进度</span><strong id="progPct">0%</strong></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <div class="step-track">
+      <div class="step-row pending" id="st-0"><div class="step-icon">📍</div><div class="step-text">地理与场景识别</div></div>
+      <div class="step-row pending" id="st-1"><div class="step-icon">🌤</div><div class="step-text">季节与时间判断</div></div>
+      <div class="step-row pending" id="st-2"><div class="step-icon">👤</div><div class="step-text">人物语境分析</div></div>
+      <div class="step-row pending" id="st-3"><div class="step-icon">🗺</div><div class="step-text">场景延展规划</div></div>
+      <div class="step-row pending" id="st-4"><div class="step-icon">✨</div><div class="step-text">生成创意方案</div></div>
+    </div>
+    <div id="analyzeError"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="page" id="p-results">
+    <div class="page-head">
+      <div class="back" onclick="goPage('p-analyze')">←</div>
+      <div class="page-title">创意方案</div>
+    </div>
+    <div id="genPromptBox"></div>
+    <div id="genStatusBar" style="display:none" class="gen-status">
+      <span id="genStatusText">生成中…</span>
+      <span class="spin">⟳</span>
+    </div>
+    <div class="result-grid" id="resultGrid"></div>
+    <div class="detail-box" id="detailBox" style="display:none">
+      <div class="detail-title">📌 方案详情</div>
+      <div id="detailContent"></div>
+    </div>
+    <div class="actions">
+      <button class="act-btn act-sec" onclick="goPage('p-upload')">← 重新上传</button>
+      <button class="act-btn act-pri" id="saveBtn" onclick="onSave()">查看图片</button>
+    </div>
+  </div>
+
+  <!-- INSPIRE -->
+  <div class="page" id="p-inspire">
+    <div class="page-head">
+      <div class="back" onclick="goPage('p-upload')">←</div>
+      <div class="page-title">💡 拍照灵感</div>
+    </div>
+    <div class="loc-bar"><span>📍</span><span id="inspireLocation">当前场景</span></div>
+    <div id="inspireCards"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-0" onclick="navTo('p-upload',0)"><div class="nav-ic">🏠</div><div class="nav-lbl">首页</div></button>
+    <button class="nav-btn" id="nav-1" onclick="navTo('p-results',1)"><div class="nav-ic">✨</div><div class="nav-lbl">方案</div></button>
+    <button class="nav-btn" id="nav-2" onclick="navTo('p-inspire',2)"><div class="nav-ic">💡</div><div class="nav-lbl">灵感</div></button>
+    <button class="nav-btn" id="nav-3"><div class="nav-ic">👤</div><div class="nav-lbl">我的</div></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const S = { images:[], goal:'4', style:'不限', plans:[], selected:null, genState:'idle' };
+let analysisData = null;
+
+const GRADS = [
+  'linear-gradient(135deg,#1a2e1a,#0e1a0e)',
+  'linear-gradient(135deg,#1e1a2e,#0e0e1e)',
+  'linear-gradient(135deg,#2e1a1a,#1e0e0e)',
+  'linear-gradient(135deg,#1a2228,#0e1418)',
+  'linear-gradient(135deg,#28201a,#180e0a)',
+  'linear-gradient(135deg,#141a28,#0a0e18)',
+];
+const TNAME = {scene:'场景',person:'人物',food:'美食',detail:'细节',vibe:'空镜'};
+
+// ── Navigation ─────────────────────────────────────────
+function goPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function navTo(id, idx) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-'+idx).classList.add('active');
+  goPage(id);
+}
+
+// ── Upload ─────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+const fi = document.getElementById('fileInput');
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', e => handleFiles(e.target.files));
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  const rem = 8 - S.images.length;
+  Array.from(files).slice(0, rem).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const r = new FileReader();
+    r.onload = e => { S.images.push({ dataUrl: e.target.result, mediaType: file.type }); renderThumbs(); };
+    r.readAsDataURL(file);
+  });
+}
+function renderThumbs() {
+  const n = S.images.length;
+  const wrap = document.getElementById('thumbsWrap');
+  wrap.style.display = n > 0 ? 'flex' : 'none';
+  document.getElementById('thumbsLabel').textContent = `已上传 ${n} 张`;
+  document.getElementById('analyzeBtn').disabled = n === 0;
+  const grid = document.getElementById('thumbGrid');
+  grid.innerHTML = '';
+  S.images.forEach((img, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img src="${img.dataUrl}"><button class="thumb-del" onclick="removeImg(${i})">✕</button>`;
+    grid.appendChild(d);
+  });
+  if (n < 8) {
+    const btn = document.createElement('button');
+    btn.className = 'thumb-add'; btn.textContent = '＋';
+    btn.onclick = () => fi.click();
+    grid.appendChild(btn);
+  }
+}
+function removeImg(i) { S.images.splice(i,1); renderThumbs(); }
+function clearAll() { S.images=[]; renderThumbs(); }
+function pickGoal(el) { document.querySelectorAll('.goal').forEach(g=>g.classList.remove('active')); el.classList.add('active'); S.goal=el.dataset.goal; }
+function pickStyle(el) { document.querySelectorAll('.style-chip').forEach(c=>c.classList.remove('on')); el.classList.add('on'); S.style=el.textContent; }
+
+// ── Analysis ───────────────────────────────────────────
+async function startAnalysis() {
+  if (!S.images.length) { toast('请先上传照片'); return; }
+  goPage('p-analyze');
+  document.getElementById('analyzeTitle').textContent = 'AI 正在理解场景…';
+  document.getElementById('analyzeError').innerHTML = '';
+  setProgress(0);
+  for (let i=0;i<5;i++) {
+    const s=document.getElementById('st-'+i);
+    s.className='step-row pending';
+    s.querySelector('.step-icon').innerHTML=['📍','🌤','👤','🗺','✨'][i];
+  }
+
+  const anim = async () => {
+    for (let i=0;i<4;i++) {
+      await sleep(400+i*300); setStep(i,'running'); setProgress(8+i*14);
+      await sleep(700+i*200); setStep(i,'done');
+    }
+    setStep(4,'running'); setProgress(72);
+  };
+
+  const callAnalyze = async () => {
+    const resp = await fetch('/api/analyze', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        images: S.images.slice(0,4).map(img=>({ data:img.dataUrl.split(',')[1], mediaType:img.mediaType })),
+        goal: S.goal, style: S.style, imageCount: S.images.length
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error||`HTTP ${resp.status}`);
+    if (!data.success) throw new Error(data.error||'分析失败');
+    return data.data;
+  };
+
+  try {
+    const [parsed] = await Promise.all([callAnalyze(), anim()]);
+    setStep(4,'done'); setProgress(100);
+    analysisData = parsed;
+    document.getElementById('analyzeTitle').textContent = '分析完成 ✓';
+
+    S.plans = (parsed.generationPlan||[]).map(p=>({...p,imageUrl:null,generating:false,genError:false,genProg:0}));
+    S.selected = null; S.genState = 'idle';
+
+    buildResultGrid();
+    buildInspire(parsed);
+
+    await sleep(600);
+    if (S.goal==='inspire') navTo('p-inspire',2);
+    else navTo('p-results',1);
+  } catch(err) {
+    setStep(4,'pending'); setProgress(0);
+    document.getElementById('analyzeTitle').textContent = '分析遇到问题';
+    document.getElementById('analyzeError').innerHTML = `<div class="err-box"><strong>⚠️ 错误</strong>${err.message}</div>`;
+  }
+}
+
+function setProgress(pct) {
+  document.getElementById('progFill').style.width = pct+'%';
+  document.getElementById('progPct').textContent = pct+'%';
+}
+function setStep(i, state) {
+  const s = document.getElementById('st-'+i);
+  s.className = 'step-row '+state;
+  const icons = ['📍','🌤','👤','🗺','✨'];
+  s.querySelector('.step-icon').innerHTML = state==='done' ? '✓' : state==='running' ? '<span class="spin">⟳</span>' : icons[i];
+}
+
+// ── Result Grid ────────────────────────────────────────
+function buildResultGrid() {
+  const grid = document.getElementById('resultGrid');
+  grid.innerHTML = '';
+  S.plans.forEach((plan,i) => {
+    const card = document.createElement('div');
+    card.className = 'r-card';
+    card.id = 'card-'+plan.id;
+    card.dataset.type = plan.type||'scene';
+    card.onclick = () => selectCard(plan.id);
+    card.style.background = GRADS[i%GRADS.length];
+    card.innerHTML = `
+      <div class="r-card-inner"><span style="font-size:32px;opacity:.6">${plan.emoji||'📸'}</span></div>
+      <div class="r-card-overlay"></div>
+      <div class="r-card-meta">
+        <div class="r-card-label">${plan.title}</div>
+        <div class="r-type rt-${plan.type||'scene'}">${TNAME[plan.type]||plan.type}</div>
+      </div>
+      <div class="sel-check">✓</div>`;
+    grid.appendChild(card);
+  });
+
+  // Show generate button
+  document.getElementById('genPromptBox').innerHTML = `
+    <div class="gen-prompt">
+      <h3>场景分析完成 ✓</h3>
+      <p>AI 规划了 ${S.plans.length} 个创意方向<br>点击下方按钮生成真实图片</p>
+      <button class="gen-btn" onclick="generateAll()">✨ 生成 ${S.plans.length} 张图片</button>
+    </div>`;
+  document.getElementById('genStatusBar').style.display = 'none';
+  document.getElementById('detailBox').style.display = 'none';
+  document.getElementById('saveBtn').textContent = '查看图片';
+}
+
+function selectCard(id) {
+  S.selected = S.selected===id ? null : id;
+  document.querySelectorAll('.r-card').forEach(c => c.classList.remove('sel'));
+  if (S.selected) document.getElementById('card-'+id)?.classList.add('sel');
+  const plan = S.plans.find(p=>p.id===id);
+  const box = document.getElementById('detailBox');
+  if (plan && S.selected) {
+    box.style.display = 'block';
+    document.getElementById('detailContent').innerHTML = `
+      ${[['方案名称',plan.title],['构图说明',plan.composition],['拍摄技巧',plan.shootingTips],['生成逻辑',plan.logic],['社交标签',(plan.socialTags||[]).map(t=>'#'+t).join(' ')]].map(([k,v])=>`<div class="meta-row"><span class="mk">${k}</span><span>${v}</span></div>`).join('')}
+      ${plan.imageUrl?`<a href="${plan.imageUrl}" target="_blank" class="dl-link">↓ 下载这张图片</a>`:''}`;
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+// ── Image Generation ───────────────────────────────────
+async function generateAll() {
+  if (S.genState==='running') return;
+  S.genState = 'running';
+  document.getElementById('genPromptBox').innerHTML = '';
+  const bar = document.getElementById('genStatusBar');
+  bar.style.display = 'flex';
+
+  let done = 0;
+  for (let i=0;i<S.plans.length;i++) {
+    const plan = S.plans[i];
+    if (plan.imageUrl) { done++; continue; }
+
+    plan.generating = true;
+    updateCard(i);
+    updateStatus(`生成中… ${done}/${S.plans.length} 张`);
+
+    // Progress animation
+    const iv = setInterval(()=>{
+      plan.genProg = Math.min((plan.genProg||0)+6, 88);
+      updateCard(i);
+    }, 1800);
+
+    try {
+      const resp = await fetch('/api/generate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ prompt: plan.imagePrompt||plan.title+' travel photography, natural light, photorealistic' })
+      });
+      const data = await resp.json();
+      clearInterval(iv);
+      if (!resp.ok) throw new Error(data.error||`HTTP ${resp.status}`);
+      plan.imageUrl = data.url;
+      plan.generating = false; plan.genProg = 100; done++;
+      updateCard(i);
+    } catch(e) {
+      clearInterval(iv);
+      plan.generating = false; plan.genError = true; plan.genErrMsg = e.message;
+      updateCard(i);
+    }
+  }
+
+  S.genState = 'done';
+  bar.innerHTML = `<span style="color:#c8ff57">✓ 已生成 ${done}/${S.plans.length} 张</span>`;
+  document.getElementById('saveBtn').textContent = `已生成 ${done} 张 ✓`;
+  toast(`✓ 完成！已生成 ${done} 张图片`);
+}
+
+function updateCard(i) {
+  const plan = S.plans[i];
+  const card = document.getElementById('card-'+plan.id);
+  if (!card) return;
+
+  if (plan.imageUrl) {
+    card.innerHTML = `
+      <img src="${plan.imageUrl}" alt="${plan.title}">
+      <div class="r-card-overlay"></div>
+      <div class="r-card-meta">
+        <div class="r-card-label">${plan.title}</div>
+        <div class="r-type rt-${plan.type||'scene'}">${TNAME[plan.type]||plan.type}</div>
+      </div>
+      <div class="sel-check">✓</div>`;
+    if (S.selected===plan.id) card.classList.add('sel');
+  } else if (plan.generating) {
+    card.querySelector('.r-card-inner').innerHTML = `
+      <span style="font-size:22px;animation:spin 1s linear infinite">⟳</span>
+      <span style="font-size:10px;color:#c8ff57">生成中…</span>
+      <div class="gen-prog"><div class="gen-prog-fill" style="width:${plan.genProg||0}%"></div></div>`;
+  } else if (plan.genError) {
+    card.querySelector('.r-card-inner').innerHTML = `
+      <span style="font-size:18px">⚠️</span>
+      <span style="font-size:9px;color:#ffaaaa;text-align:center;padding:0 4px">${plan.genErrMsg?.slice(0,30)||'生成失败'}</span>`;
+  }
+}
+
+function updateStatus(txt) {
+  document.getElementById('genStatusText').textContent = txt;
+}
+
+function onSave() {
+  const done = S.plans.filter(p=>p.imageUrl).length;
+  toast(done>0 ? `点击图片查看详情和下载链接 ✓` : '请先生成图片');
+}
+
+// ── Inspire ────────────────────────────────────────────
+function buildInspire(d) {
+  const loc = d.location||{};
+  document.getElementById('inspireLocation').textContent =
+    [loc.country, loc.city, loc.spot].filter(Boolean).join(' · ') || '当前场景';
+  const bgs = ['linear-gradient(135deg,#0e1e0e,#1a3020)','linear-gradient(135deg,#0e0e1e,#1a1a30)','linear-gradient(135deg,#1e0e0e,#301a1a)'];
+  document.getElementById('inspireCards').innerHTML = (d.inspireTips||[]).map((t,i)=>`
+    <div class="inspire-card">
+      <div class="icard-img" style="background:${bgs[i%3]}">
+        <div class="icard-bg">${t.emoji||'📷'}</div>
+        <span class="lime-tag">构图建议 0${i+1}</span>
+      </div>
+      <div class="icard-body">
+        <div class="icard-type">${t.type||''}</div>
+        <div class="icard-title">${t.title}</div>
+        <div class="icard-desc">${t.description}</div>
+        <div class="tip"><span>⏰</span><span class="tip-t"><strong>最佳时机：</strong>${t.bestTime}</span></div>
+        <div class="tip"><span>📱</span><span class="tip-t"><strong>手机技巧：</strong>${t.phoneTip}</span></div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Utils ──────────────────────────────────────────────
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
