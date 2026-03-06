@@ -13,27 +13,38 @@ export default async function handler(req, res) {
   if (!firstImage) return res.status(400).json({ error: '没有图片' });
 
   try {
-    // Step 1: Upload image to Replicate file storage to get a URL
+    // Step 1: Upload image via multipart/form-data to get a Replicate file URL
     const imageBuffer = Buffer.from(firstImage.data, 'base64');
+    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+    const mimeType = firstImage.mediaType || 'image/jpeg';
+    const filename = 'photo.jpg';
+
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
+      imageBuffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
     const uploadRes = await fetch('https://api.replicate.com/v1/files', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-        'Content-Type': firstImage.mediaType || 'image/jpeg',
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
       },
-      body: imageBuffer,
+      body,
     });
 
     if (!uploadRes.ok) {
-      const err = await uploadRes.json();
-      return res.status(uploadRes.status).json({ error: 'Image upload failed: ' + (err.detail || JSON.stringify(err)) });
+      const err = await uploadRes.json().catch(() => ({}));
+      return res.status(uploadRes.status).json({ error: 'Upload failed: ' + (err.detail || JSON.stringify(err)) });
     }
 
     const uploadData = await uploadRes.json();
-    const imageUrl = uploadData.urls?.get || uploadData.url;
-    if (!imageUrl) return res.status(500).json({ error: '图片上传未返回 URL' });
+    const imageUrl = uploadData.urls?.get;
+    if (!imageUrl) return res.status(500).json({ error: '上传未返回URL: ' + JSON.stringify(uploadData) });
 
-    // Step 2: Run llava-13b with the image URL
+    // Step 2: Run llava-13b with the uploaded image URL
     const prompt = `Analyze this travel photo and output ONLY a JSON object, no other text. Goal: ${goalTxt}, Style: ${style}.
 
 Each generationPlan needs "imagePrompt" in English describing scene/lighting/composition ending with "travel photography, natural light, photorealistic".
@@ -41,7 +52,7 @@ Each generationPlan needs "imagePrompt" in English describing scene/lighting/com
 Output JSON (Chinese fields max 15 chars):
 {"location":{"country":"","city":"","spot":"","confidence":""},"environment":{"season":"","timeOfDay":"","weather":"","atmosphere":""},"subject":{"hasPersons":false,"personType":"","style":[],"mood":""},"expansionNodes":[{"emoji":"🍁","label":"","priority":"high"},{"emoji":"🌅","label":"","priority":"high"},{"emoji":"🏯","label":"","priority":"medium"},{"emoji":"🍵","label":"","priority":"medium"},{"emoji":"🛍️","label":"","priority":"low"},{"emoji":"📸","label":"","priority":"low"}],"generationPlan":[{"id":1,"title":"","type":"scene","composition":"","logic":"","shootingTips":"","imagePrompt":"english prompt, travel photography, natural light, photorealistic","socialTags":[],"emoji":"📸"}],"inspireTips":[{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"🌅"},{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"📷"},{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"🌿"}],"summary":""}
 
-generationPlan must have exactly ${planCount} items. type must be one of: scene/person/food/detail/vibe only. Output ONLY the JSON.`;
+generationPlan must have exactly ${planCount} items. type must be one of: scene/person/food/detail/vibe. Output ONLY JSON.`;
 
     const submitRes = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
@@ -52,7 +63,7 @@ generationPlan must have exactly ${planCount} items. type must be one of: scene/
       },
       body: JSON.stringify({
         version: "80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb",
-        input: { image: imageUrl, prompt, max_tokens: 2000, temperature: 0.2, top_p: 1 }
+        input: { image: imageUrl, prompt, max_tokens: 2000, temperature: 0.2 }
       }),
     });
 
