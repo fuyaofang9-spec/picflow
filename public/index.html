@@ -590,14 +590,24 @@ function buildInspire(d) {
     <div class="inspire-card">
       <div class="icard-img" style="background:${bgs[i%3]}">
         <div class="icard-bg">${t.emoji||'📷'}</div>
-        <span class="lime-tag">构图建议 0${i+1}</span>
+        <div style="position:relative;display:flex;align-items:center;justify-content:space-between;width:100%">
+          <span class="lime-tag">${t.type||'拍摄技巧'} 0${i+1}</span>
+          ${t.spot?`<span style="font-size:10px;color:rgba(255,255,255,.6);background:rgba(0,0,0,.3);padding:3px 8px;border-radius:99px">📍${t.spot}</span>`:''}
+        </div>
       </div>
       <div class="icard-body">
-        <div class="icard-type">${t.type||''}</div>
-        <div class="icard-title">${t.title}</div>
-        <div class="icard-desc">${t.description}</div>
-        <div class="tip"><span>⏰</span><span class="tip-t"><strong>最佳时机：</strong>${t.bestTime}</span></div>
-        <div class="tip"><span>📱</span><span class="tip-t"><strong>手机技巧：</strong>${t.phoneTip}</span></div>
+        <div class="icard-title" style="font-size:16px;margin-bottom:10px">${t.emoji||''} ${t.title}</div>
+        <div style="font-size:12px;color:#b0b0c8;line-height:1.8;margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:2px solid #c8ff57">${t.description}</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px;font-size:12px;align-items:flex-start">
+            <span style="background:rgba(200,255,87,.15);color:#c8ff57;padding:2px 7px;border-radius:4px;font-size:10px;white-space:nowrap;margin-top:1px">最佳时机</span>
+            <span style="color:#efefef;line-height:1.6">${t.bestTime}</span>
+          </div>
+          <div style="display:flex;gap:8px;font-size:12px;align-items:flex-start">
+            <span style="background:rgba(124,111,255,.2);color:#b0a8ff;padding:2px 7px;border-radius:4px;font-size:10px;white-space:nowrap;margin-top:1px">手机技巧</span>
+            <span style="color:#efefef;line-height:1.6">${t.phoneTip}</span>
+          </div>
+        </div>
       </div>
     </div>`).join('');
 }
