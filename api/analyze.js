@@ -130,20 +130,86 @@ All descriptions must be hyper-specific to ${location}. Use real place names, re
     ];
   }
 
-  const typeConfigs = [
-    { type:'scene',  emoji:'🏛️', titleSuffix:'全景街道',  buildPrompt:()=>`Wide angle street view of ${location}, ${scene}. ${locationDetails.architecture||''}. ${locationDetails.colors||''} color palette. ${locationDetails.landmarks||''}. ${locationDetails.atmosphere||''}. ${stylePrompt}` },
-    { type:'person', emoji:'👤', titleSuffix:'人物故事',  buildPrompt:()=>`Person exploring ${location}, ${scene}. ${locationDetails.clothing||''}. Background: ${locationDetails.architecture||''}. ${locationDetails.atmosphere||''}. candid photography, ${stylePrompt}` },
-    { type:'food',   emoji:'🍽️', titleSuffix:'美食特写',  buildPrompt:()=>`${locationDetails.food||`Local food from ${location}`}. Traditional cuisine, authentic presentation. food photography, ${stylePrompt}` },
-    { type:'detail', emoji:'🔍', titleSuffix:'细节纹理',  buildPrompt:()=>`Close-up detail of ${location}: ${locationDetails.details||locationDetails.architecture||''}. ${locationDetails.colors||''}. macro photography, ${stylePrompt}` },
-    { type:'vibe',   emoji:'🌅', titleSuffix:'空镜氛围',  buildPrompt:()=>`Empty atmospheric scene in ${location}, ${scene}. ${locationDetails.nature||''}. ${locationDetails.atmosphere||''}. cinematic, ${stylePrompt}` },
-    { type:'scene',  emoji:'🌃', titleSuffix:'夜色街景',  buildPrompt:()=>`Night scene in ${location}. ${locationDetails.landmarks||''}. neon lights, ${stylePrompt}` },
-    { type:'person', emoji:'🧍', titleSuffix:'生活瞬间',  buildPrompt:()=>`Local daily life in ${location}. ${locationDetails.clothing||''}. ${locationDetails.atmosphere||''}. documentary style, ${stylePrompt}` },
-    { type:'detail', emoji:'🌿', titleSuffix:'自然特写',  buildPrompt:()=>`Natural detail in ${location}: ${locationDetails.nature||''}. ${locationDetails.colors||''}. ${stylePrompt}` },
-    { type:'food',   emoji:'☕', titleSuffix:'市井风情',  buildPrompt:()=>`Street market in ${location}, local vendors. ${locationDetails.atmosphere||''}. ${stylePrompt}` },
-  ];
+  // Use inspire tips to build location-specific plan spots
+  const spotNames = inspireTips.map(t => t.spot).filter(Boolean);
+  const landmark1 = spotNames[0] || locationDetails.landmarks?.split('，')[0] || location;
+  const landmark2 = spotNames[1] || spotNames[0] || location;
+  const landmark3 = spotNames[2] || spotNames[0] || location;
 
-  const compositionArr = ['广角全景，展现整体空间感','中景人像，人与环境结合','俯拍特写，突出细节质感','微距构图，捕捉纹理','空景留白，营造氛围','逆光剪影，强调轮廓','框景构图，增加纵深','对称构图，突出建筑','斜线构图，增加动感'];
-  const shootingArr    = ['超广角寻找有前景构图','人像模式虚化背景','自然光拍摄避免闪光灯','靠近开启微距模式','黄金时刻等最佳光线','逆光时点主体测光','寻找门框窗户作框架','找对称轴居中构图','利用斜线引导视线'];
+  const typeConfigs = [
+    {
+      type:'scene', emoji:'🏛️', titleSuffix:'全景地标',
+      spot: landmark1,
+      composition: `以${landmark1}为主体，采用广角镜头捕捉完整建筑轮廓，寻找人群或前景植物增加层次感`,
+      shootingTips: `站在${landmark1}正对面或侧面45°，开启超广角模式，将天空留1/3，地面留2/3，用三分法构图`,
+      logic: `${landmark1}是${location}最具代表性的视觉符号，是发圈必拍机位`,
+      buildPrompt:()=>`Wide angle street view of ${location}, ${scene}. ${locationDetails.architecture||''}. ${locationDetails.colors||''} color palette. ${locationDetails.atmosphere||''}. ${stylePrompt}`
+    },
+    {
+      type:'person', emoji:'👤', titleSuffix:'人物故事',
+      spot: landmark2,
+      composition: `在${landmark2}拍摄人物与环境的关系，人物占画面1/3，背景建筑占2/3，体现人在景中的故事感`,
+      shootingTips: `用人像模式（f1.8-f2.8）虚化背景，让被摄者面向光源，在${landmark2}特色建筑前拍摄，避免正午强光`,
+      logic: `有人物的画面更有温度，${landmark2}的建筑背景让照片具有强烈地域辨识度`,
+      buildPrompt:()=>`Person exploring ${location}, ${scene}. ${locationDetails.clothing||''}. Background: ${locationDetails.architecture||''}. ${locationDetails.atmosphere||''}. candid photography, ${stylePrompt}`
+    },
+    {
+      type:'food', emoji:'🍽️', titleSuffix:'美食特写',
+      spot: `${location}特色餐厅`,
+      composition: `${locationDetails.food ? `拍摄${locationDetails.food.split('，')[0]}` : `拍摄${location}特色美食`}，45度斜角突出食物立体感，用餐具和桌面营造用餐氛围`,
+      shootingTips: `坐在靠窗位置用自然侧光，关闭闪光灯，食物刚上桌时立即拍（热气和新鲜感），iPhone用1.5倍焦段最佳`,
+      logic: `美食是旅行内容中互动率最高的类型，${location}特色食物能引发强烈共鸣`,
+      buildPrompt:()=>`${locationDetails.food||`Local food from ${location}`}. Traditional cuisine presentation, authentic local restaurant setting. food photography, ${stylePrompt}`
+    },
+    {
+      type:'detail', emoji:'🔍', titleSuffix:'细节纹理',
+      spot: landmark1,
+      composition: `靠近${landmark1}的墙面、门窗、地砖，拍摄肉眼容易忽略的建筑细节，用极简构图突出单一元素`,
+      shootingTips: `开启微距模式或2倍变焦，保持手机稳定，点击屏幕上的细节区域精准对焦，注意利用光影在纹理上的变化`,
+      logic: `细节照片展示旅行者的观察力，与大众游客的打卡照形成差异化，提升内容质量感`,
+      buildPrompt:()=>`Macro close-up of architectural details in ${location}: ${locationDetails.details||locationDetails.architecture||''}. ${locationDetails.colors||''}. macro photography, ${stylePrompt}`
+    },
+    {
+      type:'vibe', emoji:'🌅', titleSuffix:'空镜氛围',
+      spot: landmark3,
+      composition: `在${landmark3}拍摄无人的纯景照，以天空、地面、远景三层构图，利用留白营造意境`,
+      shootingTips: `清晨6-7点游客最少，此时光线柔和无阴影，手机横持用超广角，开HDR确保高光和暗部都有细节`,
+      logic: `空镜氛围图适合作为九宫格的间隔帧，与有人物的照片形成节奏变化`,
+      buildPrompt:()=>`Empty atmospheric scene in ${location}, ${scene}. ${locationDetails.nature||''}. ${locationDetails.atmosphere||''}. no people, cinematic composition, ${stylePrompt}`
+    },
+    {
+      type:'scene', emoji:'🌃', titleSuffix:'夜色街景',
+      spot: spotNames[3] || landmark1,
+      composition: `夜晚在${spotNames[3]||landmark1}拍摄灯光街景，用车流或人流作为动态前景，固定机位拍出慢门效果`,
+      shootingTips: `手机靠在栏杆或墙上固定，开启夜间模式，曝光时间设3-5秒，让灯光拉出光轨`,
+      logic: `夜景是最容易出大片的题材，${location}夜晚的灯光氛围与白天形成强烈反差`,
+      buildPrompt:()=>`Night scene in ${location}. ${locationDetails.landmarks||''}. neon lights, illuminated streets, ${stylePrompt}`
+    },
+    {
+      type:'person', emoji:'🧍', titleSuffix:'生活瞬间',
+      spot: spotNames[3] || `${location}街头`,
+      composition: `在${spotNames[3]||location}街头抓拍当地人的日常瞬间，用中长焦保持距离，不干扰被摄者`,
+      shootingTips: `切换到2倍变焦保持距离感，提前预判画面开连拍，后期从连拍中选最自然的表情和动作`,
+      logic: `真实的人文瞬间是旅行内容最打动人的部分，展现目的地真实的生活温度`,
+      buildPrompt:()=>`Local daily life in ${location}. ${locationDetails.clothing||''}. ${locationDetails.atmosphere||''}. documentary street photography, ${stylePrompt}`
+    },
+    {
+      type:'detail', emoji:'🌿', titleSuffix:'自然特写',
+      spot: spotNames[4] || location,
+      composition: `拍摄${location}特有的植物、花卉或自然元素，以模糊背景突出主体，用光线在叶片或花瓣上的透射效果`,
+      shootingTips: `逆光拍摄植物透光效果最佳，靠近到最近对焦距离，用人像模式让背景虚化，早晨有露水时更有质感`,
+      logic: `自然细节为九宫格增添清新质感，与建筑和人物照片形成风格上的平衡`,
+      buildPrompt:()=>`Natural detail in ${location}: ${locationDetails.nature||''}. ${locationDetails.colors||''}. ${stylePrompt}`
+    },
+    {
+      type:'food', emoji:'☕', titleSuffix:'市井风情',
+      spot: spotNames[1] || `${location}集市`,
+      composition: `在${spotNames[1]||location}的集市或街边小摊，拍摄摊主劳作或食物摆放的场景，让画面有烟火气`,
+      shootingTips: `用1倍标准镜头，纳入摊主、食物和周围环境，用高角度俯拍展示食物种类的丰富感`,
+      logic: `集市和街边小吃是最能体现${location}在地文化的场景，具有强烈的生活气息`,
+      buildPrompt:()=>`Street market scene in ${location}, local vendors and food stalls. ${locationDetails.atmosphere||''}. ${stylePrompt}`
+    },
+  ];
 
   const generationPlan = Array.from({ length: planCount }, (_, i) => {
     const cfg = typeConfigs[i % typeConfigs.length];
@@ -151,9 +217,10 @@ All descriptions must be hyper-specific to ${location}. Use real place names, re
       id: i + 1,
       title: `${location}·${cfg.titleSuffix}`,
       type: cfg.type,
-      composition: compositionArr[i % compositionArr.length],
-      logic: `补充${cfg.titleSuffix}视角，丰富画面层次`,
-      shootingTips: shootingArr[i % shootingArr.length],
+      spot: cfg.spot,
+      composition: cfg.composition,
+      logic: cfg.logic,
+      shootingTips: cfg.shootingTips,
       imagePrompt: cfg.buildPrompt(),
       socialTags: [location, scene, style === '不限' ? '旅行' : style],
       emoji: cfg.emoji,

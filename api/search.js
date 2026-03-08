@@ -23,11 +23,10 @@ export default async function handler(req, res) {
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${CX}&q=${encodeURIComponent(query)}&searchType=image&num=6&imgSize=large&safe=active&imgType=photo`;
     const resp = await fetch(url);
-    if (!resp.ok) {
-      const err = await resp.json();
-      return res.status(resp.status).json({ error: err.error?.message || 'Search failed' });
-    }
     const data = await resp.json();
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: data.error?.message || 'Search failed', details: data, url: url.replace(API_KEY, 'REDACTED') });
+    }
     const items = (data.items || []).map(item => ({
       imageUrl: item.link,
       thumbUrl: item.image?.thumbnailLink || item.link,
