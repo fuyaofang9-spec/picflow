@@ -12,42 +12,17 @@ export default async function handler(req, res) {
   const firstImage = (images || [])[0];
   if (!firstImage) return res.status(400).json({ error: '没有图片' });
 
-  try {
-    // Upload image to get a URL
-    const imageBuffer = Buffer.from(firstImage.data, 'base64');
-    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
-    const mimeType = firstImage.mediaType || 'image/jpeg';
-    const body = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"; filename="photo.jpg"\r\nContent-Type: ${mimeType}\r\n\r\n`),
-      imageBuffer,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]);
+  const base64Image = `data:${firstImage.mediaType || 'image/jpeg'};base64,${firstImage.data}`;
 
-    const uploadRes = await fetch('https://api.replicate.com/v1/files', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-      },
-      body,
-    });
-    if (!uploadRes.ok) {
-      const err = await uploadRes.json().catch(() => ({}));
-      return res.status(uploadRes.status).json({ error: 'Upload failed: ' + (err.detail || JSON.stringify(err)) });
-    }
-    const uploadData = await uploadRes.json();
-    const imageUrl = uploadData.urls?.get;
-    if (!imageUrl) return res.status(500).json({ error: '上传未返回URL' });
+  const userPrompt = `Look at this travel photo carefully and output ONLY a valid JSON object. No explanation, no markdown, just JSON.
 
-    // Use llama-3.2-11b-vision - much better at following JSON instructions
-    const systemPrompt = `You are a travel photography analyst. You MUST output ONLY valid JSON, no explanations, no markdown, no extra text. Fill every field with real content based on the image.`;
+Fill every field with real specific content based on what you actually see in the image.
 
-    const userPrompt = `Look at this travel photo carefully. Output ONLY this JSON with all fields filled in based on what you actually see:
-
+Output exactly this structure with ${planCount} items in generationPlan:
 {
-  "location": {"country": "actual country name", "city": "actual city", "spot": "specific location", "confidence": "90%"},
-  "environment": {"season": "season you see", "timeOfDay": "time of day", "weather": "weather condition", "atmosphere": "mood/atmosphere"},
-  "subject": {"hasPersons": true or false, "personType": "tourist/local/etc or empty", "style": ["style1","style2"], "mood": "mood"},
+  "location": {"country": "actual country", "city": "actual city", "spot": "specific place name", "confidence": "90%"},
+  "environment": {"season": "season you see", "timeOfDay": "morning/afternoon/evening/night", "weather": "clear/cloudy/etc", "atmosphere": "describe mood"},
+  "subject": {"hasPersons": false, "personType": "", "style": [], "mood": ""},
   "expansionNodes": [
     {"emoji": "🏛️", "label": "建筑探索", "priority": "high"},
     {"emoji": "🌅", "label": "光影变化", "priority": "high"},
@@ -57,66 +32,58 @@ export default async function handler(req, res) {
     {"emoji": "🌿", "label": "自然细节", "priority": "low"}
   ],
   "generationPlan": [
-    {"id": 1, "title": "具体中文方案名", "type": "scene", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English description of what to generate based on this location: architecture style, lighting, atmosphere, street scene, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2", "tag3"], "emoji": "🏛️"},
-    {"id": 2, "title": "具体中文方案名", "type": "person", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English description, person in this location, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2"], "emoji": "👤"},
-    {"id": 3, "title": "具体中文方案名", "type": "detail", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English close-up detail shot of this location, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2"], "emoji": "🔍"}
+    {
+      "id": 1,
+      "title": "写具体中文方案名",
+      "type": "scene",
+      "composition": "写具体构图方式",
+      "logic": "写为什么要补这张",
+      "shootingTips": "写具体拍摄技巧",
+      "imagePrompt": "Write detailed English prompt: describe the exact scene, architecture style, lighting, colors, atmosphere of this specific location. End with: travel photography, natural light, photorealistic",
+      "socialTags": ["标签1", "标签2", "标签3"],
+      "emoji": "🏛️"
+    }
   ],
   "inspireTips": [
-    {"title": "构图技巧标题", "type": "构图", "description": "具体建议", "bestTime": "最佳拍摄时间", "phoneTip": "手机拍摄技巧", "emoji": "📐"},
-    {"title": "光线技巧标题", "type": "光线", "description": "具体建议", "bestTime": "最佳时间", "phoneTip": "手机技巧", "emoji": "🌅"},
-    {"title": "人文技巧标题", "type": "人文", "description": "具体建议", "bestTime": "最佳时间", "phoneTip": "手机技巧", "emoji": "👥"}
+    {"title": "写构图技巧名", "type": "构图", "description": "写具体建议", "bestTime": "写最佳时间", "phoneTip": "写手机技巧", "emoji": "📐"},
+    {"title": "写光线技巧名", "type": "光线", "description": "写具体建议", "bestTime": "写最佳时间", "phoneTip": "写手机技巧", "emoji": "🌅"},
+    {"title": "写人文技巧名", "type": "人文", "description": "写具体建议", "bestTime": "写最佳时间", "phoneTip": "写手机技巧", "emoji": "👥"}
   ],
-  "summary": "一句话描述这个地方和拍摄机会"
+  "summary": "用一句中文描述这个地方的拍摄价值"
 }
 
-Goal: ${goalTxt}, Style preference: ${style}. generationPlan must have exactly ${planCount} items. Output ONLY the JSON object.`;
+Goal: ${goalTxt}, Style: ${style}. generationPlan must have EXACTLY ${planCount} items with types from: scene/person/food/detail/vibe.`;
 
-    const submitRes = await fetch('https://api.replicate.com/v1/models/meta/llama-3.2-11b-vision-instruct/predictions', {
+  try {
+    const resp = await fetch('https://api.together.xyz/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+        'Authorization': `Bearer ${process.env.TOGETHER_API_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'wait',
       },
       body: JSON.stringify({
-        input: {
-          image: imageUrl,
-          system_prompt: systemPrompt,
-          prompt: userPrompt,
-          max_tokens: 3000,
-          temperature: 0.1,
-          top_p: 0.9,
-        }
+        model: 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo',
+        max_tokens: 3000,
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: base64Image } },
+              { type: 'text', text: userPrompt },
+            ],
+          },
+        ],
       }),
     });
 
-    if (!submitRes.ok) {
-      const err = await submitRes.json();
-      return res.status(submitRes.status).json({ error: err.detail || JSON.stringify(err) });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      return res.status(resp.status).json({ error: err.error?.message || JSON.stringify(err) });
     }
 
-    const prediction = await submitRes.json();
-    let raw = '';
-
-    if (prediction.status === 'succeeded' && prediction.output) {
-      raw = Array.isArray(prediction.output) ? prediction.output.join('') : prediction.output;
-    } else {
-      for (let i = 0; i < 40; i++) {
-        await sleep(2000);
-        const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-          headers: { 'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}` },
-        });
-        const poll = await pollRes.json();
-        if (poll.status === 'succeeded') {
-          raw = Array.isArray(poll.output) ? poll.output.join('') : (poll.output || '');
-          break;
-        }
-        if (poll.status === 'failed') return res.status(500).json({ error: poll.error || '分析失败' });
-      }
-    }
-
-    if (!raw) return res.status(500).json({ error: '未获得分析结果，请重试' });
-
+    const data = await resp.json();
+    const raw = data.choices?.[0]?.message?.content || '';
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}');
     if (s === -1 || e === -1) return res.status(500).json({ error: 'AI未返回有效JSON', raw: cleaned.slice(0, 300) });
@@ -128,5 +95,3 @@ Goal: ${goalTxt}, Style preference: ${style}. generationPlan must have exactly $
     return res.status(500).json({ error: err.message });
   }
 }
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
