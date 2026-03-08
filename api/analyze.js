@@ -13,14 +13,12 @@ export default async function handler(req, res) {
   if (!firstImage) return res.status(400).json({ error: '没有图片' });
 
   try {
-    // Step 1: Upload image via multipart/form-data to get a Replicate file URL
+    // Upload image to get a URL
     const imageBuffer = Buffer.from(firstImage.data, 'base64');
     const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
     const mimeType = firstImage.mediaType || 'image/jpeg';
-    const filename = 'photo.jpg';
-
     const body = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"; filename="photo.jpg"\r\nContent-Type: ${mimeType}\r\n\r\n`),
       imageBuffer,
       Buffer.from(`\r\n--${boundary}--\r\n`),
     ]);
@@ -30,31 +28,50 @@ export default async function handler(req, res) {
       headers: {
         'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': body.length,
       },
       body,
     });
-
     if (!uploadRes.ok) {
       const err = await uploadRes.json().catch(() => ({}));
       return res.status(uploadRes.status).json({ error: 'Upload failed: ' + (err.detail || JSON.stringify(err)) });
     }
-
     const uploadData = await uploadRes.json();
     const imageUrl = uploadData.urls?.get;
-    if (!imageUrl) return res.status(500).json({ error: '上传未返回URL: ' + JSON.stringify(uploadData) });
+    if (!imageUrl) return res.status(500).json({ error: '上传未返回URL' });
 
-    // Step 2: Run llava-13b with the uploaded image URL
-    const prompt = `Analyze this travel photo and output ONLY a JSON object, no other text. Goal: ${goalTxt}, Style: ${style}.
+    // Use llama-3.2-11b-vision - much better at following JSON instructions
+    const systemPrompt = `You are a travel photography analyst. You MUST output ONLY valid JSON, no explanations, no markdown, no extra text. Fill every field with real content based on the image.`;
 
-Each generationPlan needs "imagePrompt" in English describing scene/lighting/composition ending with "travel photography, natural light, photorealistic".
+    const userPrompt = `Look at this travel photo carefully. Output ONLY this JSON with all fields filled in based on what you actually see:
 
-Output JSON (Chinese fields max 15 chars):
-{"location":{"country":"","city":"","spot":"","confidence":""},"environment":{"season":"","timeOfDay":"","weather":"","atmosphere":""},"subject":{"hasPersons":false,"personType":"","style":[],"mood":""},"expansionNodes":[{"emoji":"🍁","label":"","priority":"high"},{"emoji":"🌅","label":"","priority":"high"},{"emoji":"🏯","label":"","priority":"medium"},{"emoji":"🍵","label":"","priority":"medium"},{"emoji":"🛍️","label":"","priority":"low"},{"emoji":"📸","label":"","priority":"low"}],"generationPlan":[{"id":1,"title":"","type":"scene","composition":"","logic":"","shootingTips":"","imagePrompt":"english prompt, travel photography, natural light, photorealistic","socialTags":[],"emoji":"📸"}],"inspireTips":[{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"🌅"},{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"📷"},{"title":"","type":"","description":"","bestTime":"","phoneTip":"","emoji":"🌿"}],"summary":""}
+{
+  "location": {"country": "actual country name", "city": "actual city", "spot": "specific location", "confidence": "90%"},
+  "environment": {"season": "season you see", "timeOfDay": "time of day", "weather": "weather condition", "atmosphere": "mood/atmosphere"},
+  "subject": {"hasPersons": true or false, "personType": "tourist/local/etc or empty", "style": ["style1","style2"], "mood": "mood"},
+  "expansionNodes": [
+    {"emoji": "🏛️", "label": "建筑探索", "priority": "high"},
+    {"emoji": "🌅", "label": "光影变化", "priority": "high"},
+    {"emoji": "🍽️", "label": "当地美食", "priority": "medium"},
+    {"emoji": "👥", "label": "人文故事", "priority": "medium"},
+    {"emoji": "🛍️", "label": "市集文化", "priority": "low"},
+    {"emoji": "🌿", "label": "自然细节", "priority": "low"}
+  ],
+  "generationPlan": [
+    {"id": 1, "title": "具体中文方案名", "type": "scene", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English description of what to generate based on this location: architecture style, lighting, atmosphere, street scene, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2", "tag3"], "emoji": "🏛️"},
+    {"id": 2, "title": "具体中文方案名", "type": "person", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English description, person in this location, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2"], "emoji": "👤"},
+    {"id": 3, "title": "具体中文方案名", "type": "detail", "composition": "具体构图说明", "logic": "为什么补这张", "shootingTips": "具体拍摄技巧", "imagePrompt": "detailed English close-up detail shot of this location, travel photography, natural light, photorealistic", "socialTags": ["tag1", "tag2"], "emoji": "🔍"}
+  ],
+  "inspireTips": [
+    {"title": "构图技巧标题", "type": "构图", "description": "具体建议", "bestTime": "最佳拍摄时间", "phoneTip": "手机拍摄技巧", "emoji": "📐"},
+    {"title": "光线技巧标题", "type": "光线", "description": "具体建议", "bestTime": "最佳时间", "phoneTip": "手机技巧", "emoji": "🌅"},
+    {"title": "人文技巧标题", "type": "人文", "description": "具体建议", "bestTime": "最佳时间", "phoneTip": "手机技巧", "emoji": "👥"}
+  ],
+  "summary": "一句话描述这个地方和拍摄机会"
+}
 
-generationPlan must have exactly ${planCount} items. type must be one of: scene/person/food/detail/vibe. Output ONLY JSON.`;
+Goal: ${goalTxt}, Style preference: ${style}. generationPlan must have exactly ${planCount} items. Output ONLY the JSON object.`;
 
-    const submitRes = await fetch('https://api.replicate.com/v1/predictions', {
+    const submitRes = await fetch('https://api.replicate.com/v1/models/meta/llama-3.2-11b-vision-instruct/predictions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.REPLICATE_API_TOKEN}`,
@@ -62,8 +79,14 @@ generationPlan must have exactly ${planCount} items. type must be one of: scene/
         'Prefer': 'wait',
       },
       body: JSON.stringify({
-        version: "80537f9eead1a5bfa72d5ac6ea6414379be41d4d4f6679fd776e9535d1eb58bb",
-        input: { image: imageUrl, prompt, max_tokens: 2000, temperature: 0.2 }
+        input: {
+          image: imageUrl,
+          system_prompt: systemPrompt,
+          prompt: userPrompt,
+          max_tokens: 3000,
+          temperature: 0.1,
+          top_p: 0.9,
+        }
       }),
     });
 
@@ -96,7 +119,7 @@ generationPlan must have exactly ${planCount} items. type must be one of: scene/
 
     const cleaned = raw.replace(/```json|```/g, '').trim();
     const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}');
-    if (s === -1 || e === -1) return res.status(500).json({ error: 'AI未返回有效JSON', raw: cleaned.slice(0, 200) });
+    if (s === -1 || e === -1) return res.status(500).json({ error: 'AI未返回有效JSON', raw: cleaned.slice(0, 300) });
 
     const parsed = JSON.parse(cleaned.slice(s, e + 1));
     return res.status(200).json({ success: true, data: parsed });
