@@ -12,31 +12,49 @@ export default async function handler(req, res) {
     scene:  `${location} ${scene} 风景 旅行`,
     person: `${location} ${scene} 人物 旅行`,
     food:   `${location} 美食 特色`,
-    detail: `${location} ${scene} 细节 建筑`,
-    vibe:   `${location} ${scene} 氛围 空镜`,
+    detail: `${location} ${scene} 建筑 细节`,
+    vibe:   `${location} ${scene} 风景`,
   };
   const query = typeQueries[type] || `${location} ${scene} 旅行`;
 
   const API_KEY = process.env.GOOGLE_API_KEY;
   const CX = process.env.GOOGLE_CX;
 
+  if (!API_KEY || !CX) {
+    return res.status(500).json({ error: '缺少 GOOGLE_API_KEY 或 GOOGLE_CX 环境变量' });
+  }
+
   try {
     const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${CX}&q=${encodeURIComponent(query)}&searchType=image&num=6&imgSize=large&safe=active&imgType=photo`;
+    
     const resp = await fetch(url);
-    const data = await resp.json();
-    if (!resp.ok) {
-      return res.status(resp.status).json({ error: data.error?.message || 'Search failed', details: data, url: url.replace(API_KEY, 'REDACTED') });
+    const text = await resp.text();
+    
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      return res.status(500).json({ error: 'Google返回非JSON: ' + text.slice(0, 200) });
     }
+
+    if (!resp.ok) {
+      return res.status(resp.status).json({ 
+        error: data.error?.message || 'Search failed',
+        code: data.error?.code,
+        status: data.error?.status,
+      });
+    }
+
     const items = (data.items || []).map(item => ({
       imageUrl: item.link,
       thumbUrl: item.image?.thumbnailLink || item.link,
       sourceUrl: item.image?.contextLink || '#',
       title: item.title,
       source: extractSource(item.image?.contextLink || ''),
-      width: item.image?.width,
-      height: item.image?.height,
     }));
-    return res.status(200).json({ success: true, items });
+
+    return res.status(200).json({ success: true, items, total: items.length });
+
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
