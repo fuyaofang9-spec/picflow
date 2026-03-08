@@ -177,7 +177,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="logo">Pic<span>Flow</span></div>
-    <div class="badge">✦ Replicate 驱动</div>
+    <div class="badge">✦ Replicate · 图像生成</div>
   </div>
 
   <!-- UPLOAD -->
@@ -188,19 +188,18 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
       <p>上传照片 → AI 理解场景 → 生成真实图片</p>
     </div>
 
-    <div class="drop" id="dropZone">
-      <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
-      <div class="drop-ico">📷</div>
-      <h3>点击或拖放照片</h3>
-      <p>支持 JPG / PNG，最多 8 张</p>
-    </div>
-
-    <div class="thumbs-wrap" id="thumbsWrap">
-      <div class="thumbs-head">
-        <span class="thumbs-label" id="thumbsLabel">已上传 0 张</span>
-        <button class="clear-btn" onclick="clearAll()">清空</button>
+    <div style="margin:4px 0 16px">
+      <div class="slabel" style="margin-bottom:8px">你在哪里拍的？</div>
+      <input id="inputLocation" type="text" placeholder="例如：京都、巴黎、大理、东京" maxlength="30"
+        style="width:100%;padding:14px 16px;background:#111115;border:1.5px solid #232330;border-radius:12px;color:#efefef;font-size:14px;font-family:inherit;outline:none"
+        oninput="checkReady()" onfocus="this.style.borderColor='#c8ff57'" onblur="this.style.borderColor='#232330'">
+      <div class="slabel" style="margin:16px 0 8px">描述一下场景</div>
+      <input id="inputScene" type="text" placeholder="例如：秋天红叶小道、夜晚霓虹街道、清晨咖啡馆" maxlength="40"
+        style="width:100%;padding:14px 16px;background:#111115;border:1.5px solid #232330;border-radius:12px;color:#efefef;font-size:14px;font-family:inherit;outline:none"
+        oninput="checkReady()" onfocus="this.style.borderColor='#c8ff57'" onblur="this.style.borderColor='#232330'">
+      <div style="margin-top:10px;padding:10px 14px;background:#18181e;border-radius:10px;font-size:11px;color:#7878a0;line-height:1.7">
+        💡 填写越具体，生成的图片越贴合你的风格
       </div>
-      <div class="thumb-grid" id="thumbGrid"></div>
     </div>
 
     <div class="slabel">选择目标</div>
@@ -232,7 +231,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
       <button class="style-chip" onclick="pickStyle(this)">复古色调</button>
     </div>
 
-    <button class="cta" id="analyzeBtn" onclick="startAnalysis()" disabled>🚀 开始 AI 分析</button>
+    <button class="cta" id="analyzeBtn" onclick="startAnalysis()" disabled>✨ 开始生成方案</button>
   </div>
 
   <!-- ANALYZING -->
@@ -343,6 +342,11 @@ function handleFiles(files) {
     r.readAsDataURL(file);
   });
 }
+function checkReady() {
+  const loc = document.getElementById('inputLocation')?.value?.trim();
+  const sc = document.getElementById('inputScene')?.value?.trim();
+  document.getElementById('analyzeBtn').disabled = !(loc && sc);
+}
 function renderThumbs() {
   const n = S.images.length;
   const wrap = document.getElementById('thumbsWrap');
@@ -371,9 +375,13 @@ function pickStyle(el) { document.querySelectorAll('.style-chip').forEach(c=>c.c
 
 // ── Analysis ───────────────────────────────────────────
 async function startAnalysis() {
-  if (!S.images.length) { toast('请先上传照片'); return; }
+  const location = document.getElementById('inputLocation')?.value?.trim();
+  const scene = document.getElementById('inputScene')?.value?.trim();
+  if (!location) { toast('请先填写拍摄地点'); return; }
+  if (!scene) { toast('请填写场景描述'); return; }
+
   goPage('p-analyze');
-  document.getElementById('analyzeTitle').textContent = 'AI 正在理解场景…';
+  document.getElementById('analyzeTitle').textContent = 'AI 正在规划创意方案…';
   document.getElementById('analyzeError').innerHTML = '';
   setProgress(0);
   for (let i=0;i<5;i++) {
@@ -384,24 +392,21 @@ async function startAnalysis() {
 
   const anim = async () => {
     for (let i=0;i<4;i++) {
-      await sleep(400+i*300); setStep(i,'running'); setProgress(8+i*14);
-      await sleep(700+i*200); setStep(i,'done');
+      await sleep(300+i*200); setStep(i,'running'); setProgress(10+i*16);
+      await sleep(500+i*150); setStep(i,'done');
     }
-    setStep(4,'running'); setProgress(72);
+    setStep(4,'running'); setProgress(80);
   };
 
   const callAnalyze = async () => {
     const resp = await fetch('/api/analyze', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        images: S.images.slice(0,4).map(img=>({ data:img.dataUrl.split(',')[1], mediaType:img.mediaType })),
-        goal: S.goal, style: S.style, imageCount: S.images.length
-      })
+      body: JSON.stringify({ location, scene, style: S.style, goal: S.goal })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error||`HTTP ${resp.status}`);
-    if (!data.success) throw new Error(data.error||'分析失败');
+    if (!data.success) throw new Error(data.error||'规划失败');
     return data.data;
   };
 
