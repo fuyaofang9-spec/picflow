@@ -379,6 +379,8 @@ async function startAnalysis() {
   const scene = document.getElementById('inputScene')?.value?.trim();
   if (!location) { toast('请先填写拍摄地点'); return; }
   if (!scene) { toast('请填写场景描述'); return; }
+  S.location = location;
+  S.scene = scene;
 
   goPage('p-analyze');
   document.getElementById('analyzeTitle').textContent = 'AI 正在规划创意方案…';
@@ -521,7 +523,7 @@ async function generateAll() {
       const resp = await fetch('/api/generate', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ prompt: plan.imagePrompt||plan.title+' travel photography, natural light, photorealistic' })
+        body: JSON.stringify({ prompt: plan.imagePrompt||plan.title+' travel photography, natural light, photorealistic', location: S.location||'', scene: S.scene||'', type: plan.type||'scene' })
       });
       const data = await resp.json();
       clearInterval(iv);
