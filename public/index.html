@@ -512,6 +512,7 @@ async function generateAll() {
     }, 1800);
 
     try {
+      await sleep(3000); // avoid throttling
       const resp = await fetch('/api/generate', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
