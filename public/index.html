@@ -177,7 +177,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="logo">Pic<span>Flow</span></div>
-    <div class="badge">✦ Replicate · 图像生成</div>
+    <div class="badge">✦ 真实图片 · 社交媒体</div>
   </div>
 
   <!-- UPLOAD -->
@@ -206,12 +206,12 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
     <div class="goals">
       <div class="goal active" data-goal="4" onclick="pickGoal(this)">
         <div class="goal-ico" style="background:rgba(200,255,87,.15)">⬛</div>
-        <div class="goal-info"><div class="goal-name">生成四宫格</div><div class="goal-desc">生成 4 张真实图片</div></div>
+        <div class="goal-info"><div class="goal-name">生成四宫格</div><div class="goal-desc">搜索 4 张真实图片</div></div>
         <div class="goal-tag">4张</div>
       </div>
       <div class="goal" data-goal="9" onclick="pickGoal(this)">
         <div class="goal-ico" style="background:rgba(124,111,255,.15)">⬜</div>
-        <div class="goal-info"><div class="goal-name">生成九宫格</div><div class="goal-desc">生成 9 张真实图片</div></div>
+        <div class="goal-info"><div class="goal-name">生成九宫格</div><div class="goal-desc">搜索 9 张真实图片</div></div>
         <div class="goal-tag">9张</div>
       </div>
       <div class="goal" data-goal="inspire" onclick="pickGoal(this)">
@@ -472,7 +472,7 @@ function buildResultGrid() {
     <div class="gen-prompt">
       <h3>场景分析完成 ✓</h3>
       <p>AI 规划了 ${S.plans.length} 个创意方向<br>点击下方按钮生成真实图片</p>
-      <button class="gen-btn" onclick="generateAll()">✨ 生成 ${S.plans.length} 张</button>
+      <button class="gen-btn" onclick="generateAll()">🔍 搜索 ${S.plans.length} 张真实图片</button>
     </div>`;
   document.getElementById('genStatusBar').style.display = 'none';
   document.getElementById('detailBox').style.display = 'none';
@@ -489,7 +489,8 @@ function selectCard(id) {
     box.style.display = 'block';
     document.getElementById('detailContent').innerHTML = `
       ${[['方案名称',plan.title],['构图说明',plan.composition],['拍摄技巧',plan.shootingTips],['生成逻辑',plan.logic],['社交标签',(plan.socialTags||[]).map(t=>'#'+t).join(' ')]].map(([k,v])=>`<div class="meta-row"><span class="mk">${k}</span><span>${v}</span></div>`).join('')}
-      ${plan.imageUrl?`<a href="${plan.imageUrl}" target="_blank" class="dl-link">↓ 下载这张图片</a>`:''}`;
+      ${plan.sourceUrl?`<a href="${plan.sourceUrl}" target="_blank" class="dl-link" style="background:rgba(200,255,87,.15);color:#c8ff57;border:1px solid rgba(200,255,87,.3)">🔗 查看原帖</a>`:''}
+      ${plan.imageUrl?`<a href="${plan.imageUrl}" target="_blank" class="dl-link" style="margin-top:6px">↓ 保存图片</a>`:''}`;
   } else {
     box.style.display = 'none';
   }
@@ -502,46 +503,53 @@ async function generateAll() {
   document.getElementById('genPromptBox').innerHTML = '';
   const bar = document.getElementById('genStatusBar');
   bar.style.display = 'flex';
+  updateStatus(`搜索真实图片中…`);
 
+  // Search images for all plan types at once
+  const types = [...new Set(S.plans.map(p=>p.type||'scene'))];
+  const searchResults = {};
+
+  await Promise.all(types.map(async type => {
+    try {
+      const resp = await fetch('/api/search', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ location: S.location||'', scene: S.scene||'', type })
+      });
+      const data = await resp.json();
+      if (data.success) searchResults[type] = data.items || [];
+    } catch(e) { searchResults[type] = []; }
+  }));
+
+  // Assign images to plans
+  const typeCounters = {};
   let done = 0;
   for (let i=0;i<S.plans.length;i++) {
     const plan = S.plans[i];
-    if (plan.imageUrl) { done++; continue; }
+    const type = plan.type || 'scene';
+    typeCounters[type] = (typeCounters[type]||0);
+    const items = searchResults[type] || searchResults['scene'] || [];
+    const item = items[typeCounters[type] % Math.max(items.length,1)];
+    typeCounters[type]++;
 
-    plan.generating = true;
-    updateCard(i);
-    updateStatus(`生成中… ${done}/${S.plans.length} 张`);
-
-    // Progress animation
-    const iv = setInterval(()=>{
-      plan.genProg = Math.min((plan.genProg||0)+6, 88);
-      updateCard(i);
-    }, 1800);
-
-    try {
-      await sleep(3000); // avoid throttling
-      const resp = await fetch('/api/generate', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ prompt: plan.imagePrompt||plan.title+' travel photography, natural light, photorealistic', location: S.location||'', scene: S.scene||'', type: plan.type||'scene' })
-      });
-      const data = await resp.json();
-      clearInterval(iv);
-      if (!resp.ok) throw new Error(data.error||`HTTP ${resp.status}`);
-      plan.imageUrl = data.url;
-      plan.generating = false; plan.genProg = 100; done++;
-      updateCard(i);
-    } catch(e) {
-      clearInterval(iv);
-      plan.generating = false; plan.genError = true; plan.genErrMsg = e.message;
-      updateCard(i);
+    if (item) {
+      plan.imageUrl = item.imageUrl;
+      plan.thumbUrl = item.thumbUrl;
+      plan.sourceUrl = item.sourceUrl;
+      plan.sourceTitle = item.title;
+      plan.sourceName = item.source;
+      done++;
+    } else {
+      plan.genError = true;
+      plan.genErrMsg = '未找到图片';
     }
+    updateCard(i);
   }
 
   S.genState = 'done';
-  bar.innerHTML = `<span style="color:#c8ff57">✓ 已生成 ${done}/${S.plans.length} 张</span>`;
-  document.getElementById('saveBtn').textContent = `已生成 ${done} 张 ✓`;
-  toast(`✓ 完成！已生成 ${done} 张图片`);
+  bar.innerHTML = `<span style="color:#c8ff57">✓ 已找到 ${done}/${S.plans.length} 张真实图片</span>`;
+  document.getElementById('saveBtn').textContent = `已找到 ${done} 张 ✓`;
+  toast(`✓ 完成！找到 ${done} 张真实旅行图片`);
 }
 
 function updateCard(i) {
@@ -551,23 +559,23 @@ function updateCard(i) {
 
   if (plan.imageUrl) {
     card.innerHTML = `
-      <img src="${plan.imageUrl}" alt="${plan.title}">
+      <img src="${plan.imageUrl}" alt="${plan.title}" onerror="this.src='${plan.thumbUrl||''}';this.onerror=null">
       <div class="r-card-overlay"></div>
       <div class="r-card-meta">
         <div class="r-card-label">${plan.title}</div>
         <div class="r-type rt-${plan.type||'scene'}">${TNAME[plan.type]||plan.type}</div>
       </div>
+      ${plan.sourceName?`<div style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:2px 8px;border-radius:99px;font-size:9px;color:#fff">${plan.sourceName}</div>`:''}
       <div class="sel-check">✓</div>`;
     if (S.selected===plan.id) card.classList.add('sel');
   } else if (plan.generating) {
     card.querySelector('.r-card-inner').innerHTML = `
       <span style="font-size:22px;animation:spin 1s linear infinite">⟳</span>
-      <span style="font-size:10px;color:#c8ff57">生成中…</span>
-      <div class="gen-prog"><div class="gen-prog-fill" style="width:${plan.genProg||0}%"></div></div>`;
+      <span style="font-size:10px;color:#c8ff57">搜索中…</span>`;
   } else if (plan.genError) {
     card.querySelector('.r-card-inner').innerHTML = `
       <span style="font-size:18px">⚠️</span>
-      <span style="font-size:9px;color:#ffaaaa;text-align:center;padding:0 4px">${plan.genErrMsg?.slice(0,30)||'生成失败'}</span>`;
+      <span style="font-size:9px;color:#ffaaaa;text-align:center;padding:0 4px">${plan.genErrMsg?.slice(0,30)||'未找到'}</span>`;
   }
 }
 
@@ -577,7 +585,7 @@ function updateStatus(txt) {
 
 function onSave() {
   const done = S.plans.filter(p=>p.imageUrl).length;
-  toast(done>0 ? `点击图片查看详情和下载链接 ✓` : '请先生成图片');
+  toast(done>0 ? `点击图片可跳转原始来源 ✓` : '请先搜索图片');
 }
 
 // ── Inspire ────────────────────────────────────────────
