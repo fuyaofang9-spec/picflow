@@ -488,9 +488,12 @@ function selectCard(id) {
   if (plan && S.selected) {
     box.style.display = 'block';
     document.getElementById('detailContent').innerHTML = `
-      ${[['方案名称',plan.title],['构图说明',plan.composition],['拍摄技巧',plan.shootingTips],['生成逻辑',plan.logic],['社交标签',(plan.socialTags||[]).map(t=>'#'+t).join(' ')]].map(([k,v])=>`<div class="meta-row"><span class="mk">${k}</span><span>${v}</span></div>`).join('')}
-      ${plan.sourceUrl?`<a href="${plan.sourceUrl}" target="_blank" class="dl-link" style="background:rgba(200,255,87,.15);color:#c8ff57;border:1px solid rgba(200,255,87,.3)">🔗 查看原帖</a>`:''}
-      ${plan.imageUrl?`<a href="${plan.imageUrl}" target="_blank" class="dl-link" style="margin-top:6px">↓ 保存图片</a>`:''}`;
+      ${plan.spot ? `<div class="meta-row"><span class="mk">📍 推荐地点</span><span style="color:#c8ff57;font-weight:600">${plan.spot}</span></div>` : ''}
+      ${[['🖼️ 构图说明',plan.composition],['📸 拍摄技巧',plan.shootingTips],['💡 拍摄逻辑',plan.logic],['🏷️ 社交标签',(plan.socialTags||[]).map(t=>'#'+t).join(' ')]].map(([k,v])=>`<div class="meta-row" style="align-items:flex-start"><span class="mk" style="flex-shrink:0;padding-top:2px">${k}</span><span style="line-height:1.7;color:#ddd">${v||'-'}</span></div>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:4px">
+        ${plan.sourceUrl?`<a href="${plan.sourceUrl}" target="_blank" class="dl-link" style="flex:1;text-align:center;background:rgba(200,255,87,.12);color:#c8ff57;border:1px solid rgba(200,255,87,.25)">🔗 查看原帖</a>`:''}
+        ${plan.imageUrl?`<a href="${plan.imageUrl}" target="_blank" class="dl-link" style="flex:1;text-align:center;margin-top:0">↓ 保存图片</a>`:''}
+      </div>`;
   } else {
     box.style.display = 'none';
   }
