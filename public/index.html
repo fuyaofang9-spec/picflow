@@ -206,13 +206,13 @@ html,body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC','Pin
     <div class="goals">
       <div class="goal active" data-goal="4" onclick="pickGoal(this)">
         <div class="goal-ico" style="background:rgba(200,255,87,.15)">⬛</div>
-        <div class="goal-info"><div class="goal-name">补齐四宫格</div><div class="goal-desc">生成 3 张真实图片</div></div>
-        <div class="goal-tag">3张</div>
+        <div class="goal-info"><div class="goal-name">生成四宫格</div><div class="goal-desc">生成 4 张真实图片</div></div>
+        <div class="goal-tag">4张</div>
       </div>
       <div class="goal" data-goal="9" onclick="pickGoal(this)">
         <div class="goal-ico" style="background:rgba(124,111,255,.15)">⬜</div>
-        <div class="goal-info"><div class="goal-name">补齐九宫格</div><div class="goal-desc">生成 6 张真实图片</div></div>
-        <div class="goal-tag">6张</div>
+        <div class="goal-info"><div class="goal-name">生成九宫格</div><div class="goal-desc">生成 9 张真实图片</div></div>
+        <div class="goal-tag">9张</div>
       </div>
       <div class="goal" data-goal="inspire" onclick="pickGoal(this)">
         <div class="goal-ico" style="background:rgba(255,107,107,.15)">💡</div>
@@ -472,7 +472,7 @@ function buildResultGrid() {
     <div class="gen-prompt">
       <h3>场景分析完成 ✓</h3>
       <p>AI 规划了 ${S.plans.length} 个创意方向<br>点击下方按钮生成真实图片</p>
-      <button class="gen-btn" onclick="generateAll()">✨ 生成 ${S.plans.length} 张图片</button>
+      <button class="gen-btn" onclick="generateAll()">✨ 生成 ${S.plans.length} 张</button>
     </div>`;
   document.getElementById('genStatusBar').style.display = 'none';
   document.getElementById('detailBox').style.display = 'none';
