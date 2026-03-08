@@ -587,27 +587,34 @@ function buildInspire(d) {
     [loc.country, loc.city, loc.spot].filter(Boolean).join(' · ') || '当前场景';
   const bgs = ['linear-gradient(135deg,#0e1e0e,#1a3020)','linear-gradient(135deg,#0e0e1e,#1a1a30)','linear-gradient(135deg,#1e0e0e,#301a1a)'];
   document.getElementById('inspireCards').innerHTML = (d.inspireTips||[]).map((t,i)=>`
-    <div class="inspire-card">
-      <div class="icard-img" style="background:${bgs[i%3]}">
+    <div class="inspire-card" style="margin-bottom:16px">
+      <div class="icard-img" style="background:${bgs[i%3]};height:80px">
         <div class="icard-bg">${t.emoji||'📷'}</div>
         <div style="position:relative;display:flex;align-items:center;justify-content:space-between;width:100%">
-          <span class="lime-tag">${t.type||'拍摄技巧'} 0${i+1}</span>
-          ${t.spot?`<span style="font-size:10px;color:rgba(255,255,255,.6);background:rgba(0,0,0,.3);padding:3px 8px;border-radius:99px">📍${t.spot}</span>`:''}
+          <span style="font-size:10px;padding:3px 10px;border-radius:99px;background:rgba(200,255,87,.15);color:#c8ff57;border:1px solid rgba(200,255,87,.2)">${t.type||'拍摄技巧'}</span>
+          ${t.spot?`<span style="font-size:10px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.4);padding:3px 8px;border-radius:99px">📍 ${t.spot}</span>`:''}
         </div>
       </div>
-      <div class="icard-body">
-        <div class="icard-title" style="font-size:16px;margin-bottom:10px">${t.emoji||''} ${t.title}</div>
-        <div style="font-size:12px;color:#b0b0c8;line-height:1.8;margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;border-left:2px solid #c8ff57">${t.description}</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;gap:8px;font-size:12px;align-items:flex-start">
-            <span style="background:rgba(200,255,87,.15);color:#c8ff57;padding:2px 7px;border-radius:4px;font-size:10px;white-space:nowrap;margin-top:1px">最佳时机</span>
-            <span style="color:#efefef;line-height:1.6">${t.bestTime}</span>
+      <div class="icard-body" style="padding:16px">
+        <div style="font-size:16px;font-weight:700;margin-bottom:12px;line-height:1.4">${t.title}</div>
+
+        <div style="font-size:12px;color:#c8c8e0;line-height:1.9;margin-bottom:14px;padding:12px 14px;background:rgba(200,255,87,0.04);border-radius:10px;border-left:3px solid #c8ff57;white-space:pre-line">${t.description}</div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="background:rgba(200,255,87,.15);color:#c8ff57;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:1px">⏰ 最佳时机</span>
+            <span style="font-size:12px;color:#efefef;line-height:1.7">${t.bestTime}</span>
           </div>
-          <div style="display:flex;gap:8px;font-size:12px;align-items:flex-start">
-            <span style="background:rgba(124,111,255,.2);color:#b0a8ff;padding:2px 7px;border-radius:4px;font-size:10px;white-space:nowrap;margin-top:1px">手机技巧</span>
-            <span style="color:#efefef;line-height:1.6">${t.phoneTip}</span>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="background:rgba(124,111,255,.2);color:#b0a8ff;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;margin-top:1px">📱 手机技巧</span>
+            <span style="font-size:12px;color:#efefef;line-height:1.7">${t.phoneTip}</span>
           </div>
         </div>
+
+        ${t.hashtags&&t.hashtags.length?`
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${t.hashtags.map(tag=>`<span style="font-size:10px;padding:3px 9px;border-radius:99px;background:#18181e;color:#7878a0;border:1px solid #232330">${tag}</span>`).join('')}
+        </div>`:''}
       </div>
     </div>`).join('');
 }
