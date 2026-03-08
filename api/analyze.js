@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { location, scene, style, goal } = req.body;
-  const planCount = goal === '4' ? 3 : goal === '9' ? 6 : 4;
+  const planCount = goal === '4' ? 4 : goal === '9' ? 9 : 4;
 
   // Step 1: Use LLM to research location-specific visual details
   let locationDetails = { architecture: '', clothing: '', food: '', nature: '', colors: '', landmarks: '' };
